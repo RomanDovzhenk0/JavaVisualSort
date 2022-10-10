@@ -1,76 +1,50 @@
 package com.javasort.javasorttask;
 
-import javafx.animation.KeyFrame;
-import javafx.animation.PauseTransition;
-import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
-import javafx.event.ActionEvent;
-import javafx.event.EventHandler;
 import javafx.fxml.FXML;
-import javafx.scene.chart.BarChart;
-import javafx.scene.chart.CategoryAxis;
-import javafx.scene.chart.NumberAxis;
-import javafx.scene.chart.XYChart;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Slider;
 import javafx.scene.layout.HBox;
 import javafx.scene.paint.Color;
-import javafx.scene.paint.Paint;
 import javafx.scene.shape.Rectangle;
-import javafx.util.Duration;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.TimeUnit;
 
 public class ViewController {
     @FXML
-    private BarChart<String, Number> barChart;
-
-    @FXML
     private Button shuffleButton;
-
     @FXML
     private HBox hBox;
-
     @FXML
     private ComboBox<String> comboBox;
-
-    private final int COUNT = 30;
-
-    private List<Integer> list = new ArrayList<>();
-
     @FXML
     private Slider speedSlider;
-
     @FXML
     private Button sortButton;
+    private List<Integer> list = new ArrayList<>();
+    private List<Integer> buffer = new ArrayList<>();
+    private final int COUNT = 64;
 
     public void initialize() {
         fillList();
 
-        for (int i = 0; i < list.size(); i++) {
-            Rectangle rectangle = new Rectangle();
-            rectangle.setX(i * 500 / COUNT);
-            rectangle.setWidth(500 / COUNT);
-            rectangle.setHeight(list.get(i) * 300 / COUNT);
-            rectangle.fillProperty().set(Color.BLUEVIOLET);
-            rectangle.setStroke(Color.BROWN);
-            hBox.getChildren().add(rectangle);
-        }
+        drawRectangles();
 
         comboBox.setItems(FXCollections.observableArrayList(
                 "BubbleSort",
-                "ShellSort",
+                "MergeSort",
                 "InsertionSort",
-                "SelectionSort"
+                "SelectionSort",
+                "CocktailSort"
         ));
         comboBox.setValue("BubbleSort");
 
         sortButton.setOnAction(event -> sort());
+
         shuffleButton.setOnAction(actionEvent -> {
             list.clear();
             fillList();
@@ -86,8 +60,9 @@ public class ViewController {
                 if (list.get(i) < list.get(i - 1)) {
                     needIteration = true;
                     int finalI = i;
-                    Platform.runLater(() -> swap(finalI, finalI - 1));
-                    try {Thread.sleep((int) speedSlider.getValue());} catch (InterruptedException e) {}
+                    swap(i, i - 1);
+                    Platform.runLater(() -> highlight(finalI, finalI - 1));
+                    try {Thread.sleep((int) speedSlider.getValue());} catch (InterruptedException ignored) {}
                 }
             }
         }
@@ -95,58 +70,125 @@ public class ViewController {
 
     public void selectionSort() {
         for (int left = 0; left < list.size(); left++) {
-            int maxInd = left;
             int minInd = left;
-            for (int i = left; i < list.size() - left; i++) {
-                if (list.get(i) >= list.get(maxInd)) {
-                    maxInd = i;
-                }
-                if (list.get(i) <= list.get(minInd)) {
+            for (int i = left; i < list.size(); i++) {
+                if (list.get(i) < list.get(minInd)) {
                     minInd = i;
                 }
             }
             int finalLeft = left;
-            int finalMaxInd = maxInd;
-            try {Thread.sleep((int) speedSlider.getValue());} catch (InterruptedException e) {}
-            Platform.runLater(() -> swap(list.size() - finalLeft - 1, finalMaxInd));
-            try {Thread.sleep((int) speedSlider.getValue());} catch (InterruptedException e) {}
             int finalMinInd = minInd;
-            Platform.runLater(() -> swap(finalLeft, finalMinInd));
+            Platform.runLater(() -> highlight(finalLeft, finalMinInd));
+            swap(left, minInd);
+            try {Thread.sleep((int) speedSlider.getValue());} catch (InterruptedException ignored) {}
         }
     }
+
     public void insertionSort() {
         for (int left = 0; left < list.size(); left++) {
             int value = list.get(left);
             int i = left - 1;
             for (; i >= 0; i--) {
                 int finalI = i;
+                int finalLeft = left;
                 if (value < list.get(i)) {
                     list.set(i + 1, list.get(i));
-                    try {Thread.sleep((int) speedSlider.getValue());} catch (InterruptedException e) {}
-                    Platform.runLater(() -> swap(finalI + 1, finalI + 1));
                 } else {
                     break;
                 }
-                try {Thread.sleep((int) speedSlider.getValue());} catch (InterruptedException e) {}
-                Platform.runLater(() -> swap(finalI, finalI));
+                try {Thread.sleep((int) speedSlider.getValue());} catch (InterruptedException ignored) {}
+                Platform.runLater(() -> highlight(finalLeft, finalI));
             }
             list.set(i + 1, value);
         }
     }
 
-    public void shellSort() {
-        int gap = list.size() / 2;
-        while (gap >= 1) {
-            for (int right = 0; right < list.size(); right++) {
-                for (int c = right - gap; c >= 0; c -= gap) {
-                    if (list.get(c) > list.get(c + gap)) {
-                        int finalC = c;
-                        int finalGap = gap;
-                        Platform.runLater(() -> swap(finalC, finalC + finalGap));
-                    }
-                }
+    public void mergeSort(List<Integer> list) {
+        if (list.size() < 2) {
+            return;
+        }
+        int mid = list.size()/2;
+        List<Integer> left = new ArrayList<>(list.subList(0, mid));
+        List<Integer> right = new ArrayList<>(list.subList(mid, list.size()));
+
+        for (int i = 0; i < this.list.size(); i++) {
+            try {Thread.sleep((int) speedSlider.getValue());} catch (InterruptedException ignored) {}
+            int finalI1 = i;
+            if(left.contains(this.list.get(i))) {
+                Platform.runLater(() -> highlightPermanentlyToGreen(finalI1));
+            } else if(right.contains(this.list.get(i))) {
+                Platform.runLater(() -> highlightPermanentlyToOrange(finalI1));
             }
-            gap = gap / 2;
+        }
+        Platform.runLater(this::refresh);
+        mergeSort(left);
+        mergeSort(right);
+        merge(left, right, list);
+        buffer.removeAll(list);
+        buffer.addAll(list);
+        for (int i = 0; i < buffer.size(); i++) {
+            this.list.set(i, buffer.get(i));
+        }
+        try {Thread.sleep((int) speedSlider.getValue());} catch (InterruptedException ignored) {}
+        Platform.runLater(this::refresh);
+    }
+
+    public void cocktailSort() {
+        boolean swapped = true;
+        int start = 0;
+        int end = list.size();
+
+        while (swapped)
+        {
+            int finalStart = start;
+            int finalEnd = end - 1;
+            swapped = false;
+            for (int i = start; i < end - 1; ++i) {
+                if (list.get(i) > list.get(i + 1)) {
+                    int temp = list.get(i);
+                    list.set(i, list.get(i + 1));
+                    list.set(i + 1, temp);
+                    swapped = true;
+                }
+                Platform.runLater(() -> highlight(finalStart, finalEnd));
+                try {Thread.sleep((int) speedSlider.getValue()/2);} catch (InterruptedException ignored) {}
+            }
+            if (!swapped) {
+                break;
+            }
+            swapped = false;
+            end = end - 1;
+            for (int i = end - 1; i >= start; i--) {
+                if (list.get(i) > list.get(i + 1)) {
+                    int temp = list.get(i);
+                    list.set(i, list.get(i + 1));
+                    list.set(i + 1, temp);
+                    swapped = true;
+                }
+                Platform.runLater(() -> highlight(finalStart, finalEnd));
+                try {Thread.sleep((int) speedSlider.getValue()/2);} catch (InterruptedException ignored) {}
+            }
+            start = start + 1;
+        }
+    }
+
+    private void merge(List<Integer> left, List<Integer> right, List<Integer> list) {
+        int leftIndex = 0;
+        int rightIndex = 0;
+        int listIndex = 0;
+
+        while (leftIndex < left.size() && rightIndex < right.size()) {
+            if (left.get(leftIndex) < right.get(rightIndex)) {
+                list.set(listIndex++, left.get(leftIndex++));
+            } else {
+                list.set(listIndex++, right.get(rightIndex++));
+            }
+        }
+        while (leftIndex < left.size()) {
+            list.set(listIndex++, left.get(leftIndex++));
+        }
+        while (rightIndex < right.size()) {
+            list.set(listIndex++, right.get(rightIndex++));
         }
     }
 
@@ -154,44 +196,66 @@ public class ViewController {
         new Thread(() -> {
             if(comboBox.getValue().equals("BubbleSort"))
                 bubbleSort();
-            else if(comboBox.getValue().equals("ShellSort"))
-                shellSort();
+            else if(comboBox.getValue().equals("MergeSort"))
+                mergeSort(list);
             else if(comboBox.getValue().equals("InsertionSort"))
                 insertionSort();
             else if(comboBox.getValue().equals("SelectionSort"))
                 selectionSort();
+            else if(comboBox.getValue().equals("CocktailSort"))
+                cocktailSort();
+
+            for (int i = 0; i < list.size(); i++) {
+                int finalI = i;
+                Platform.runLater(() -> highlightPermanentlyToGreen(finalI));
+                try {Thread.sleep(10);} catch (InterruptedException ignored) {}
+            }
+
+            Platform.runLater(this::activateSortButton);
         }).start();
+        sortButton.setDisable(true);
+    }
+
+    private void activateSortButton() {
+        sortButton.setDisable(false);
+    }
+
+    private void highlight(int i1, int i2) {
+        hBox.getChildren().clear();
+        drawRectangles();
+        ((Rectangle) hBox.getChildren().get(i1)).fillProperty().set(Color.GREEN);
+        ((Rectangle) hBox.getChildren().get(i2)).fillProperty().set(Color.ORANGE);
+    }
+
+    private void highlightPermanentlyToGreen(int i1) {
+        ((Rectangle) hBox.getChildren().get(i1)).fillProperty().set(Color.GREEN);
+    }
+
+    private void highlightPermanentlyToOrange(int i1) {
+        ((Rectangle) hBox.getChildren().get(i1)).fillProperty().set(Color.ORANGE);
     }
 
     private void swap(int i1, int i2) {
         int buffer = list.get(i2);
         list.set(i2, list.get(i1));
         list.set(i1, buffer);
-        hBox.getChildren().clear();
+    }
+
+    private void drawRectangles() {
         for (int i = 0; i < list.size(); i++) {
             Rectangle rectangle = new Rectangle();
             rectangle.setX(i * 500 / COUNT);
             rectangle.setWidth(500 / COUNT);
             rectangle.setHeight(list.get(i) * 300 / COUNT);
             rectangle.fillProperty().set(Color.BLUEVIOLET);
-            rectangle.setStroke(Color.BROWN);
+            rectangle.setStroke(Color.BLACK);
             hBox.getChildren().add(rectangle);
         }
-        ((Rectangle) hBox.getChildren().get(i1)).fillProperty().set(Color.GREEN);
-        ((Rectangle) hBox.getChildren().get(i2)).fillProperty().set(Color.ORANGE);
     }
 
     private void refresh() {
         hBox.getChildren().clear();
-        for (int i = 0; i < list.size(); i++) {
-            Rectangle rectangle = new Rectangle();
-            rectangle.setX(i * 500 / COUNT);
-            rectangle.setWidth(500 / COUNT);
-            rectangle.setHeight(list.get(i) * 300 / COUNT);
-            rectangle.fillProperty().set(Color.BLUEVIOLET);
-            rectangle.setStroke(Color.BROWN);
-            hBox.getChildren().add(rectangle);
-        }
+        drawRectangles();
     }
 
     private void fillList() {
